@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avast AI Chat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #000000;
+            --container-bg: #1a1a1a;
+            --header-color: rgb(125, 0, 0);
+            --chat-bg: #202020;
+            --border-color: #333;
+            --user-msg-bg: #530000;
+            --ai-msg-bg: #000000;
+            --text-color: #e0e0e0;
+            --input-bg: #000000;
+            --button-bg: #530000;
+            --button-hover-bg: #530000;
+            --google-button-bg: #ffffff;
+            --google-button-text: #000000;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background-color: var(--container-bg);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            animation: fadeIn 0.8s ease-out;
+            position: relative;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Menü-Stile */
+        .menu-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+        
+        .menu-icon {
+            cursor: pointer;
+            width: 30px;
+            height: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .menu-icon .bar {
+            width: 100%;
+            height: 3px;
+            background-color: var(--header-color);
+            border-radius: 5px;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .sidebar-menu {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 250px;
+            height: 100%;
+            background-color: var(--container-bg);
+            border-right: 1px solid var(--border-color);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+            transition: left 0.3s ease-in-out;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 99;
+        }
+
+        .sidebar-menu.open {
+            left: 0;
+        }
+        
+        .sidebar-menu-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-radius: 10px;
+            background-color: #2a2a2a;
+            color: var(--text-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+            position: relative;
+        }
+
+        .sidebar-menu-item:hover {
+            background-color: #3a3a3a;
+        }
+
+        .chat-title {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .delete-chat-button {
+            background-color: transparent;
+            border: none;
+            color: red;
+            font-weight: bold;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: color 0.2s, transform 0.2s;
+            visibility: hidden;
+            opacity: 0;
+            padding: 0 5px;
+        }
+
+        .sidebar-menu-item:hover .delete-chat-button {
+            visibility: visible;
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .header {
+            text-align: center;
+            font-size: 3em;
+            font-weight: 700;
+            color: var(--header-color);
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px rgba(85, 170, 255, 0.5);
+        }
+
+        .chat-window {
+            height: 600px;
+            background-color: var(--chat-bg);
+            border-radius: 15px;
+            padding: 20px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--header-color) var(--chat-bg);
+        }
+
+        .chat-window::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-window::-webkit-scrollbar-track {
+            background: var(--chat-bg);
+            border-radius: 10px;
+        }
+        .chat-window::-webkit-scrollbar-thumb {
+            background-color: var(--header-color);
+            border-radius: 10px;
+            border: 2px solid var(--chat-bg);
+        }
+
+        .message {
+            padding: 12px 18px;
+            border-radius: 25px;
+            max-width: 75%;
+            word-wrap: break-word;
+            line-height: 1.5;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            animation: messageSlideIn 0.5s ease-out;
+            font-size: 1em;
+        }
+
+        .ai-message p {
+            margin: 0;
+            padding: 0;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+        .ai-message p:last-child {
+            margin-bottom: 0;
+        }
+        .ai-message ul, .ai-message ol {
+            margin-left: 20px;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        .ai-message li {
+            margin-bottom: 5px;
+        }
+
+        @keyframes messageSlideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .user-message {
+            background-color: var(--user-msg-bg);
+            color: #fff;
+            align-self: flex-end;
+            border-bottom-right-radius: 5px;
+        }
+
+        .ai-message {
+            background-color: var(--ai-msg-bg);
+            color: var(--text-color);
+            align-self: flex-start;
+            border-bottom-left-radius: 5px;
+        }
+
+        .input-area {
+            display: flex;
+            flex-grow: 1;
+            width: 100%;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .search-bar {
+            flex-grow: 1;
+            padding: 14px 25px;
+            border-radius: 30px;
+            border: 1px solid var(--border-color);
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            font-size: 1.1em;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .search-bar:focus {
+            border-color: var(--header-color);
+            box-shadow: 0 0 10px rgba(85, 170, 255, 0.6);
+        }
+        
+        .send-button {
+            padding: 14px 30px;
+            border-radius: 30px;
+            border: none;
+            background-color: var(--button-bg);
+            color: #fff;
+            font-size: 1.1em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+        
+        .send-button:hover {
+            background-color: var(--button-hover-bg);
+            transform: translateY(-2px);
+        }
+        .send-button:active {
+            transform: translateY(0);
+        }
+
+        .google-button {
+            margin-top: 30px;
+            padding: 18px 40px;
+            border-radius: 35px;
+            border: none;
+            background-color: var(--google-button-bg);
+            color: var(--google-button-text);
+            font-size: 1.2em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.5px;
+        }
+
+        .google-button:hover {
+            background-color: #eee;
+            transform: translateY(-3px);
+            box-shadow: 8px 25px rgba(0, 0, 0, 0.6);
+        }
+        .google-button:active {
+            transform: translateY(0);
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        /* Snake Game Styles */
+        #gameCanvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            border: 2px solid var(--header-color);
+            background-color: #000;
+            z-index: 50;
+        }
+        
+        #gameCanvas.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                gap: 20px;
+            }
+            .header {
+                font-size: 2.5em;
+            }
+            .chat-window {
+                height: 350px;
+                padding: 15px;
+            }
+            .message {
+                max-width: 85%;
+            }
+            .input-area {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .search-bar, .send-button {
+                width: 100%;
+                padding: 12px 20px;
+                font-size: 1em;
+            }
+            .google-button {
+                padding: 15px 30px;
+                font-size: 1em;
+                margin-top: 25px;
+            }
+            .menu-container {
+                left: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                border-radius: 15px;
+                padding: 15px;
+            }
+            .header {
+                font-size: 2em;
+            }
+            .chat-window {
+                height: 300px;
+            }
+            .message {
+                padding: 10px 15px;
+            }
+            .search-bar, .send-button {
+                font-size: 0.9em;
+            }
+            .google-button {
+                font-size: 0.9em;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="menu-container" onclick="toggleMenu()">
+        <div class="menu-icon">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
+    </div>
+
+    <div class="sidebar-menu" id="sidebarMenu">
+        <div class="sidebar-menu-item" onclick="startNewChat()">
+            <span class="chat-title">Neuen Chat beginnen</span>
+        </div>
+        <div id="chatListContainer"></div>
+    </div>
+    
+    <canvas id="gameCanvas" width="500" height="500"></canvas>
+
+    <div class="container">
+        <div class="header">
+            Avast AI
+        </div>
+        <div class="chat-window" id="chatWindow">
+            <div class="message ai-message">Hallo! Ich bin Avast. Wie kann ich Ihnen heute helfen?</div>
+        </div>
+        <div class="input-area">
+            <input type="text" class="search-bar" placeholder="Sprechen Sie mit Avast AI..." id="userInput">
+            <button class="send-button" onclick="sendMessage()">Senden</button>
+        </div>
+    </div>
+    
+    <a href="https://www.google.de" target="_blank">
+        <button class="google-button">
+            Zur Google-Suche
+        </button>
+    </a>
+
+    <script>
+        const API_KEY = "AIzaSyBKfavRWIuZk5bJFp2t_G_RpNsmqhPycgs";
+        const API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + API_KEY;
+        const CHAT_STORAGE_KEY = "avast-ai-chats";
+        
+        let chats = [];
+        let currentChatIndex = -1;
+        
+        // Snake Game Variablen
+        let gameActive = false;
+        let snake, food, score, direction, gameSpeed, gameLoop;
+        const gridSize = 20;
+
+        function saveChats() {
+            localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chats));
+        }
+
+        function loadChats() {
+            const storedChats = localStorage.getItem(CHAT_STORAGE_KEY);
+            if (storedChats) {
+                chats = JSON.parse(storedChats);
+            }
+        }
+
+        function renderChatList() {
+            const chatListContainer = document.getElementById('chatListContainer');
+            chatListContainer.innerHTML = '';
+            chats.forEach((chat, index) => {
+                const chatItem = document.createElement('div');
+                chatItem.className = 'sidebar-menu-item';
+                
+                const chatTitle = document.createElement('span');
+                chatTitle.className = 'chat-title';
+                chatTitle.textContent = chat.title.length > 20 ? chat.title.substring(0, 20) + '...' : chat.title;
+                chatItem.appendChild(chatTitle);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'delete-chat-button';
+                deleteButton.textContent = 'X';
+                deleteButton.onclick = (event) => {
+                    event.stopPropagation();
+                    deleteChat(index);
+                };
+                chatItem.appendChild(deleteButton);
+
+                chatItem.onclick = () => loadChat(index);
+                chatListContainer.appendChild(chatItem);
+            });
+        }
+
+        function deleteChat(index) {
+            chats.splice(index, 1);
+            saveChats();
+            renderChatList();
+            if (chats.length === 0 || currentChatIndex === index) {
+                startNewChat();
+            } else if (currentChatIndex > index) {
+                currentChatIndex--;
+                loadChat(currentChatIndex);
+            } else {
+                loadChat(currentChatIndex);
+            }
+        }
+
+        function loadChat(index) {
+            currentChatIndex = index;
+            const chatWindow = document.getElementById('chatWindow');
+            chatWindow.innerHTML = '';
+            chats[currentChatIndex].messages.forEach(msg => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${msg.role}-message`;
+                if (msg.role === 'ai') {
+                    messageDiv.innerHTML = formatMarkdownToHtml(msg.text);
+                } else {
+                    messageDiv.textContent = msg.text;
+                }
+                chatWindow.appendChild(messageDiv);
+            });
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            toggleMenu();
+        }
+
+        function startNewChat() {
+            currentChatIndex = chats.length;
+            chats.push({
+                title: 'Neuer Chat',
+                messages: []
+            });
+            saveChats();
+            const chatWindow = document.getElementById('chatWindow');
+            chatWindow.innerHTML = '';
+            
+            const initialMessage = document.createElement('div');
+            initialMessage.className = 'message ai-message';
+            initialMessage.textContent = 'Hallo! Ich bin Avast. Wie kann ich Ihnen heute helfen?';
+            chatWindow.appendChild(initialMessage);
+            
+            renderChatList();
+            toggleMenu();
+        }
+
+        function formatMarkdownToHtml(markdownText) {
+            let htmlText = markdownText;
+            
+            const listRegex = /^\s*(\d+\.\s+|-|\*)\s+(.*)/gm;
+            const lines = htmlText.split('\n');
+            let formattedLines = [];
+            let inList = false;
+            let listType = '';
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.match(/^\s*[-*]\s/)) {
+                    if (!inList || listType !== 'ul') {
+                        if (inList) formattedLines.push('</' + listType + '>');
+                        formattedLines.push('<ul>');
+                        inList = true;
+                        listType = 'ul';
+                    }
+                    formattedLines.push('<li>' + line.trim().substring(1).trim() + '</li>');
+                } else if (line.match(/^\s*\d+\.\s/)) {
+                    if (!inList || listType !== 'ol') {
+                        if (inList) formattedLines.push('</' + listType + '>');
+                        formattedLines.push('<ol>');
+                        inList = true;
+                        listType = 'ol';
+                    }
+                    formattedLines.push('<li>' + line.trim().substring(line.indexOf('.') + 1).trim() + '</li>');
+                } else {
+                    if (inList) {
+                        formattedLines.push('</' + listType + '>');
+                        inList = false;
+                    }
+                    formattedLines.push('<p>' + line.trim() + '</p>');
+                }
+            }
+            if (inList) formattedLines.push('</' + listType + '>');
+            htmlText = formattedLines.join('');
+
+            htmlText = htmlText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            htmlText = htmlText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            return htmlText;
+        }
+
+        async function sendMessage() {
+            const userInput = document.getElementById('userInput');
+            const chatWindow = document.getElementById('chatWindow');
+            const userMessageText = userInput.value.trim();
+
+            if (userMessageText === '') {
+                return;
+            }
+
+            // Spezialbefehl für Snake-Spiel
+            if (userMessageText.toLowerCase() === '/snake') {
+                startSnakeGame();
+                userInput.value = '';
+                return;
+            }
+            
+            // Speichere die Benutzer-Nachricht im Chat-Verlauf
+            if (currentChatIndex === -1) {
+                startNewChat();
+            }
+            
+            if (chats[currentChatIndex].messages.length === 0) {
+                chats[currentChatIndex].title = userMessageText;
+                renderChatList();
+            }
+
+            chats[currentChatIndex].messages.push({
+                role: 'user',
+                text: userMessageText
+            });
+            saveChats();
+
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'message user-message';
+            userMessageDiv.textContent = userMessageText;
+            chatWindow.appendChild(userMessageDiv);
+
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            const aiMessageDiv = document.createElement('div');
+            aiMessageDiv.className = 'message ai-message';
+            aiMessageDiv.textContent = 'Avast denkt nach...';
+            chatWindow.appendChild(aiMessageDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            userInput.value = '';
+            userInput.disabled = true;
+            document.querySelector('.send-button').disabled = true;
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: userMessageText
+                            }]
+                        }]
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API-Fehler: ${response.status} ${response.statusText} - ${errorData.error ? errorData.error.message : 'Unbekannter Fehler'}`);
+                }
+
+                const data = await response.json();
+                
+                chatWindow.removeChild(aiMessageDiv);
+
+                const finalAiMessage = document.createElement('div');
+                finalAiMessage.className = 'message ai-message';
+                
+                let aiResponse = 'Entschuldigung, Avast konnte keine klare Antwort finden.';
+                if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text) {
+                    aiResponse = data.candidates[0].content.parts[0].text;
+                    finalAiMessage.innerHTML = formatMarkdownToHtml(aiResponse);
+                } else if (data.error) {
+                    aiResponse = `Fehler von der KI: ${data.error.message}`;
+                    finalAiMessage.textContent = aiResponse;
+                } else {
+                    finalAiMessage.textContent = aiResponse;
+                }
+                
+                chats[currentChatIndex].messages.push({
+                    role: 'ai',
+                    text: aiResponse
+                });
+                saveChats();
+
+                chatWindow.appendChild(finalAiMessage);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            } catch (error) {
+                chatWindow.removeChild(aiMessageDiv);
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'message ai-message';
+                errorMessage.textContent = 'Ein Problem ist aufgetreten: ' + error.message;
+                chatWindow.appendChild(errorMessage);
+                console.error('API-Fehler:', error);
+            } finally {
+                userInput.disabled = false;
+                document.querySelector('.send-button').disabled = false;
+                userInput.focus();
+            }
+        }
+
+        document.getElementById('userInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter' && !userInput.disabled) {
+                sendMessage();
+            }
+        });
+
+        // Menü-Funktionalität
+        function toggleMenu() {
+            const menu = document.getElementById('sidebarMenu');
+            menu.classList.toggle('open');
+        }
+
+        // Initialisierung
+        document.addEventListener('DOMContentLoaded', () => {
+            loadChats();
+            if (chats.length > 0) {
+                loadChat(0);
+            } else {
+                startNewChat();
+            }
+            renderChatList();
+        });
+
+        // Snake Game Logik
+        function startSnakeGame() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.classList.add('active');
+            
+            document.querySelector('.container').style.display = 'none';
+            document.querySelector('.google-button').style.display = 'none';
+
+            gameActive = true;
+            snake = [{ x: 10, y: 10 }];
+            score = 0;
+            direction = 'right';
+            gameSpeed = 150;
+            
+            placeFood();
+            
+            document.addEventListener('keydown', changeDirection);
+            
+            gameLoop = setInterval(gameTick, gameSpeed);
+
+            function gameTick() {
+                if (!gameActive) {
+                    clearInterval(gameLoop);
+                    return;
+                }
+                
+                moveSnake();
+                
+                if (checkCollision()) {
+                    endGame();
+                    return;
+                }
+                
+                if (eatFood()) {
+                    score++;
+                    placeFood();
+                } else {
+                    snake.pop();
+                }
+                
+                draw();
+            }
+
+            function moveSnake() {
+                const head = { x: snake[0].x, y: snake[0].y };
+                
+                switch(direction) {
+                    case 'up':
+                        head.y--;
+                        break;
+                    case 'down':
+                        head.y++;
+                        break;
+                    case 'left':
+                        head.x--;
+                        break;
+                    case 'right':
+                        head.x++;
+                        break;
+                }
+                
+                snake.unshift(head);
+            }
+
+            function draw() {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#0f0';
+                snake.forEach(segment => {
+                    ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 1, gridSize - 1);
+                });
+                
+                ctx.fillStyle = 'red';
+                ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
+            }
+
+            function placeFood() {
+                food = {
+                    x: Math.floor(Math.random() * (canvas.width / gridSize)),
+                    y: Math.floor(Math.random() * (canvas.height / gridSize))
+                };
+                
+                for (const segment of snake) {
+                    if (segment.x === food.x && segment.y === food.y) {
+                        placeFood();
+                        return;
+                    }
+                }
+            }
+
+            function checkCollision() {
+                const head = snake[0];
+                
+                if (head.x < 0 || head.x >= canvas.width / gridSize || head.y < 0 || head.y >= canvas.height / gridSize) {
+                    return true;
+                }
+                
+                for (let i = 1; i < snake.length; i++) {
+                    if (head.x === snake[i].x && head.y === snake[i].y) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            }
+            
+            function eatFood() {
+                return snake[0].x === food.x && snake[0].y === food.y;
+            }
+
+            function changeDirection(event) {
+                const keyPressed = event.key;
+                const up = direction === 'up';
+                const down = direction === 'down';
+                const left = direction === 'left';
+                const right = direction === 'right';
+                
+                if (keyPressed === 'ArrowLeft' && !right) {
+                    direction = 'left';
+                } else if (keyPressed === 'ArrowUp' && !down) {
+                    direction = 'up';
+                } else if (keyPressed === 'ArrowRight' && !left) {
+                    direction = 'right';
+                } else if (keyPressed === 'ArrowDown' && !up) {
+                    direction = 'down';
+                }
+            }
+            
+            function endGame() {
+                gameActive = false;
+                
+                const message = `Spiel vorbei! Dein Score: ${score}. Tippe /snake, um erneut zu spielen.`;
+                
+                const aiMessageDiv = document.createElement('div');
+                aiMessageDiv.className = 'message ai-message';
+                aiMessageDiv.textContent = message;
+                document.getElementById('chatWindow').appendChild(aiMessageDiv);
+                
+                document.getElementById('gameCanvas').classList.remove('active');
+                document.querySelector('.container').style.display = 'flex';
+                document.querySelector('.google-button').style.display = 'block';
+                
+                document.getElementById('userInput').disabled = false;
+                document.querySelector('.send-button').disabled = false;
+                document.getElementById('userInput').focus();
+            }
+        }
+    </script>
+
+</body>
+</html>
