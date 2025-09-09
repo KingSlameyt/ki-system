@@ -20,6 +20,12 @@
             --button-hover-bg: #530000;
             --google-button-bg: #ffffff;
             --google-button-text: #000000;
+
+            /* Harvey Game Colors */
+            --harvey-bg: #111;
+            --harvey-button: #444;
+            --harvey-button-hover: #666;
+            --harvey-coin-color: gold;
         }
 
         body {
@@ -319,6 +325,76 @@
             display: block;
         }
 
+        /* Harvey Game Styles */
+        #harveyGameContainer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            width: 600px;
+            height: 700px; /* Mehr Platz für Upgrades */
+            background-color: var(--harvey-bg);
+            border: 2px solid var(--header-color);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 50;
+        }
+
+        #harveyGameContainer.active {
+            display: flex;
+        }
+
+        #harveyCanvas {
+            border: 1px solid var(--border-color);
+            background-color: #222;
+            cursor: pointer;
+            border-radius: 10px;
+        }
+
+        #harveyStats {
+            width: 100%;
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            color: var(--harvey-coin-color);
+        }
+
+        #harveyUpgrades {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .harvey-upgrade-button {
+            background-color: var(--harvey-button);
+            color: var(--text-color);
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .harvey-upgrade-button:hover {
+            background-color: var(--harvey-button-hover);
+        }
+
+        .harvey-upgrade-button:disabled {
+            background-color: #333;
+            color: #777;
+            cursor: not-allowed;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 20px;
@@ -350,6 +426,15 @@
             }
             .menu-container {
                 left: 10px;
+            }
+            #harveyGameContainer {
+                width: 90%;
+                height: 90%;
+                padding: 15px;
+            }
+            #harveyCanvas {
+                width: 100%;
+                height: auto; /* Anpassung für mobile Geräte */
             }
         }
 
@@ -395,6 +480,27 @@
     
     <canvas id="gameCanvas" width="500" height="500"></canvas>
 
+    <div id="harveyGameContainer">
+        <div id="harveyStats">
+            Avast Coins: <span id="harveyCoins">0</span> | Klick: <span id="harveyClickPower">1</span> | Passiv: <span id="harveyPassiveIncome">0</span>/s
+        </div>
+        <canvas id="harveyCanvas" width="300" height="300"></canvas>
+        <div id="harveyUpgrades">
+            <button class="harvey-upgrade-button" id="upgradeClick" onclick="buyUpgrade('click')">
+                <span>Klickkraft erhöhen</span>
+                <span>Kosten: <span id="clickUpgradeCost">10</span> Avast Coins</span>
+            </button>
+            <button class="harvey-upgrade-button" id="upgradePassive" onclick="buyUpgrade('passive')">
+                <span>Passive Einnahmen</span>
+                <span>Kosten: <span id="passiveUpgradeCost">50</span> Avast Coins</span>
+            </button>
+            <button class="harvey-upgrade-button" onclick="closeHarveyGame()">
+                <span>Spiel verlassen</span>
+                <span></span>
+            </button>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             Avast AI
@@ -415,17 +521,27 @@
     </a>
 
     <script>
-        const API_KEY = "AIzaSyBKfavRWIuZk5bJFp2t_G_RpNsmqhPycgs";
+        const API_KEY = "YOUR_GEMINI_API_KEY_HERE";
         const API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + API_KEY;
         const CHAT_STORAGE_KEY = "avast-ai-chats";
+        const HARVEY_STORAGE_KEY = "avast-harvey-game";
         
         let chats = [];
         let currentChatIndex = -1;
         
         // Snake Game Variablen
-        let gameActive = false;
+        let snakeGameActive = false;
         let snake, food, score, direction, gameSpeed, gameLoop;
         const gridSize = 20;
+
+        // Harvey Game Variablen
+        let harveyGameActive = false;
+        let harveyCoins = 0;
+        let harveyClickPower = 1;
+        let harveyPassiveIncome = 0; // Coins pro Sekunde
+        let clickUpgradeCost = 10;
+        let passiveUpgradeCost = 50;
+        let harveyGameInterval;
 
         function saveChats() {
             localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chats));
@@ -570,7 +686,15 @@
 
             // Spezialbefehl für Snake-Spiel
             if (userMessageText.toLowerCase() === '/snake') {
+                if (harveyGameActive) closeHarveyGame();
                 startSnakeGame();
+                userInput.value = '';
+                return;
+            }
+            // Spezialbefehl für Harvey-Spiel
+            if (userMessageText.toLowerCase() === '/harvey') {
+                if (snakeGameActive) endSnakeGame();
+                startHarveyGame();
                 userInput.value = '';
                 return;
             }
@@ -701,7 +825,7 @@
             document.querySelector('.container').style.display = 'none';
             document.querySelector('.google-button').style.display = 'none';
 
-            gameActive = true;
+            snakeGameActive = true;
             snake = [{ x: 10, y: 10 }];
             score = 0;
             direction = 'right';
@@ -709,20 +833,20 @@
             
             placeFood();
             
-            document.addEventListener('keydown', changeDirection);
+            document.addEventListener('keydown', changeSnakeDirection); // Geändert von changeDirection
             
             gameLoop = setInterval(gameTick, gameSpeed);
 
             function gameTick() {
-                if (!gameActive) {
+                if (!snakeGameActive) {
                     clearInterval(gameLoop);
                     return;
                 }
                 
                 moveSnake();
                 
-                if (checkCollision()) {
-                    endGame();
+                if (checkSnakeCollision()) { // Geändert von checkCollision
+                    endSnakeGame(); // Geändert von endGame
                     return;
                 }
                 
@@ -733,7 +857,7 @@
                     snake.pop();
                 }
                 
-                draw();
+                drawSnake(); // Geändert von draw
             }
 
             function moveSnake() {
@@ -757,7 +881,7 @@
                 snake.unshift(head);
             }
 
-            function draw() {
+            function drawSnake() { // Geändert von draw
                 ctx.fillStyle = '#000';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
@@ -784,7 +908,7 @@
                 }
             }
 
-            function checkCollision() {
+            function checkSnakeCollision() { // Geändert von checkCollision
                 const head = snake[0];
                 
                 if (head.x < 0 || head.x >= canvas.width / gridSize || head.y < 0 || head.y >= canvas.height / gridSize) {
@@ -804,7 +928,7 @@
                 return snake[0].x === food.x && snake[0].y === food.y;
             }
 
-            function changeDirection(event) {
+            function changeSnakeDirection(event) { // Geändert von changeDirection
                 const keyPressed = event.key;
                 const up = direction === 'up';
                 const down = direction === 'down';
@@ -822,10 +946,10 @@
                 }
             }
             
-            function endGame() {
-                gameActive = false;
+            function endSnakeGame() { // Geändert von endGame
+                snakeGameActive = false;
                 
-                const message = `Spiel vorbei! Dein Score: ${score}. Tippe /snake, um erneut zu spielen.`;
+                const message = `Snake Spiel vorbei! Dein Score: ${score}. Tippe /snake, um erneut zu spielen.`;
                 
                 const aiMessageDiv = document.createElement('div');
                 aiMessageDiv.className = 'message ai-message';
@@ -839,7 +963,157 @@
                 document.getElementById('userInput').disabled = false;
                 document.querySelector('.send-button').disabled = false;
                 document.getElementById('userInput').focus();
+                
+                document.removeEventListener('keydown', changeSnakeDirection);
             }
+        }
+
+        // Harvey Game Logik
+        function saveHarveyGameState() {
+            const harveyState = {
+                coins: harveyCoins,
+                clickPower: harveyClickPower,
+                passiveIncome: harveyPassiveIncome,
+                clickUpgradeCost: clickUpgradeCost,
+                passiveUpgradeCost: passiveUpgradeCost
+            };
+            localStorage.setItem(HARVEY_STORAGE_KEY, JSON.stringify(harveyState));
+        }
+
+        function loadHarveyGameState() {
+            const storedState = localStorage.getItem(HARVEY_STORAGE_KEY);
+            if (storedState) {
+                const state = JSON.parse(storedState);
+                harveyCoins = state.coins;
+                harveyClickPower = state.clickPower;
+                harveyPassiveIncome = state.passiveIncome;
+                clickUpgradeCost = state.clickUpgradeCost;
+                passiveUpgradeCost = state.passiveUpgradeCost;
+            }
+        }
+
+        function updateHarveyHUD() {
+            document.getElementById('harveyCoins').textContent = harveyCoins.toFixed(0);
+            document.getElementById('harveyClickPower').textContent = harveyClickPower.toFixed(0);
+            document.getElementById('harveyPassiveIncome').textContent = harveyPassiveIncome.toFixed(1);
+            document.getElementById('clickUpgradeCost').textContent = clickUpgradeCost.toFixed(0);
+            document.getElementById('passiveUpgradeCost').textContent = passiveUpgradeCost.toFixed(0);
+
+            // Button-Status aktualisieren
+            document.getElementById('upgradeClick').disabled = harveyCoins < clickUpgradeCost;
+            document.getElementById('upgradePassive').disabled = harveyCoins < passiveUpgradeCost;
+        }
+
+        function drawHarvey() {
+            const canvas = document.getElementById('harveyCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Canvas leeren
+
+            // Harvey (als Kreis dargestellt)
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 50;
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = 'orange'; // Farbe von Harvey
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#333';
+            ctx.stroke();
+            ctx.closePath();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('HARVEY', centerX, centerY + 8);
+        }
+
+        function clickHarvey() {
+            harveyCoins += harveyClickPower;
+            updateHarveyHUD();
+            saveHarveyGameState();
+            drawHarveyEffect(); // Optional: Klick-Effekt
+        }
+        
+        function drawHarveyEffect() {
+            const canvas = document.getElementById('harveyCanvas');
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            // Kleiner Kreiseffekt beim Klick
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 60, 0, Math.PI * 2, false);
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+            ctx.lineWidth = 5;
+            ctx.stroke();
+            ctx.closePath();
+
+            // Kurz warten und dann neu zeichnen
+            setTimeout(() => {
+                drawHarvey();
+            }, 100);
+        }
+
+
+        function buyUpgrade(type) {
+            if (type === 'click' && harveyCoins >= clickUpgradeCost) {
+                harveyCoins -= clickUpgradeCost;
+                harveyClickPower++;
+                clickUpgradeCost = Math.floor(clickUpgradeCost * 1.5); // Kosten erhöhen
+            } else if (type === 'passive' && harveyCoins >= passiveUpgradeCost) {
+                harveyCoins -= passiveUpgradeCost;
+                harveyPassiveIncome += 0.1; // Passive Einnahmen erhöhen
+                passiveUpgradeCost = Math.floor(passiveUpgradeCost * 1.8); // Kosten erhöhen
+            }
+            updateHarveyHUD();
+            saveHarveyGameState();
+        }
+
+        function updateHarveyGame() {
+            if (!harveyGameActive) return;
+
+            harveyCoins += harveyPassiveIncome / 10; // Passive Einnahmen pro 100ms
+            updateHarveyHUD();
+            saveHarveyGameState();
+        }
+
+        function startHarveyGame() {
+            const harveyGameContainer = document.getElementById('harveyGameContainer');
+            harveyGameContainer.classList.add('active');
+            
+            document.querySelector('.container').style.display = 'none';
+            document.querySelector('.google-button').style.display = 'none';
+
+            harveyGameActive = true;
+            loadHarveyGameState(); // Spielstand laden
+            updateHarveyHUD();
+            drawHarvey();
+
+            document.getElementById('harveyCanvas').addEventListener('click', clickHarvey);
+            harveyGameInterval = setInterval(updateHarveyGame, 100); // 10 mal pro Sekunde aktualisieren
+        }
+
+        function closeHarveyGame() {
+            harveyGameActive = false;
+            clearInterval(harveyGameInterval); // Passive Einnahmen stoppen
+            document.getElementById('harveyCanvas').removeEventListener('click', clickHarvey);
+            document.getElementById('harveyGameContainer').classList.remove('active');
+
+            document.querySelector('.container').style.display = 'flex';
+            document.querySelector('.google-button').style.display = 'block';
+
+            document.getElementById('userInput').disabled = false;
+            document.querySelector('.send-button').disabled = false;
+            document.getElementById('userInput').focus();
+            
+            // Optional: Eine Nachricht im Chat, dass das Spiel beendet wurde
+            const aiMessageDiv = document.createElement('div');
+            aiMessageDiv.className = 'message ai-message';
+            aiMessageDiv.textContent = `Harvey-Spiel beendet. Dein aktueller Kontostand: ${harveyCoins.toFixed(0)} Avast Coins.`;
+            document.getElementById('chatWindow').appendChild(aiMessageDiv);
+            document.getElementById('chatWindow').scrollTop = document.getElementById('chatWindow').scrollHeight;
         }
     </script>
 
